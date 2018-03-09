@@ -1,10 +1,3 @@
-/****************************************************************************
- * Copyright (C) 2018 Vishal Bhalani
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the LGPL License
- *****************************************************************************/
-
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
 #include <QFileDialog>
