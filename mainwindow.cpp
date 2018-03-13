@@ -13,6 +13,8 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     qApp->setApplicationName("Om");
+    qApp->setApplicationVersion("1.0");
+    qApp->setApplicationDisplayName("Om");
     settings = new QSettings(QString("%1/om.ini").arg(QDir::homePath()), QSettings::IniFormat, this);
     ui->leFileName->setText(settings->value("om/fileName", "").toString());
     ui->spCounter->setValue(settings->value("om/counter", 1).toInt());
@@ -42,21 +44,26 @@ void MainWindow::on_pbGenerate_clicked()
     }
 
     auto reader = new QXmlStreamReader(&xmlFile);
+    QString trainName = "";
+    qint64 trainNumber = 0;
+    QFileInfo info(xmlFile);
+    QString suffix = info.completeSuffix();
 
+    ui->pbGenerate->setEnabled(false);
     for(int i = 0; i < ui->spCounter->value(); ++i)
     {
-        QString trainName = "";
-        qint64 trainNumber = 0;
-        QFileInfo info(xmlFile);
-        QString filename = QString("%1/temp.trn").arg(info.absolutePath());
+        QString filename = QString("%1/temp.%2").arg(info.absolutePath()).arg(suffix);
         QFile *file = new QFile(filename);
         QXmlStreamWriter *writer = new QXmlStreamWriter(file);
         writer->setAutoFormatting(true);
+
         if(!file->open(QIODevice::ReadWrite))
         {
+            ui->pbGenerate->setEnabled(true);
             QMessageBox::critical(this,tr("Om"), tr("Couldn't create %1 to write data").arg(file->fileName()), QMessageBox::Ok);
             return;
         }
+
         xmlFile.seek(0);
         reader->setDevice(reader->device());
         while(!reader->atEnd() && !reader->hasError())
@@ -66,29 +73,50 @@ void MainWindow::on_pbGenerate_clicked()
                 continue;
             if(token == QXmlStreamReader::StartElement)
             {
-                if(reader->name() == "Zug")
+
+                writer->writeStartElement(reader->name().toString());
+
+                if(reader->name() == "Zug" || reader->name() == "Buchfahrplan")
                 {
                     foreach(auto &attr, reader->attributes())
                     {
+                        QXmlStreamAttribute attribute;
                         if(attr.name().toString() == "Gattung")
                             trainName = attr.value().toString();
                         if(attr.name().toString() == "Nummer")
-                            trainNumber = attr.value().toLongLong();
+                        {
+                            trainNumber = attr.value().toLongLong() + (ui->spTrain->value() * (i+1));
+                            attribute = QXmlStreamAttribute(attr.name().toString(), QString::number(trainNumber));
+                        }
+                        else
+                            attribute = QXmlStreamAttribute(attr.name().toString(), attr.value().toString());
+                        writer->writeAttribute(attribute);
                     }
-                    filename = QString("%1/%2%3.trn").arg(info.absolutePath()).arg(trainName).arg(trainNumber+(ui->spTrain->value() * (i+1)));
+                    filename = QString("%1/%2%3.%4").arg(info.absolutePath()).arg(trainName).arg(trainNumber).arg(suffix);
                     statusBar()->showMessage(tr("generating file :%1").arg(filename));
-                    writer->writeCurrentToken(*reader);
-                    continue;
                 }
-
-                if(!writer)
+                else if(reader->name() == "BuchfahrplanRohDatei" || reader->name() == "Datei_trn")
                 {
-                    qDebug()<<reader->name().toString();
-                    continue;
+                    foreach(auto &attr, reader->attributes())
+                    {
+                        QXmlStreamAttribute attribute;
+                        if(attr.name().toString() == "Dateiname")
+                        {
+                            QString timeTable = attr.value().toString();
+                            QStringList parts = timeTable.split("\\");
+                            QString ref = parts.last();
+                            QStringList refList = ref.split(".");
+                            refList.removeFirst();
+                            parts.removeLast();
+                            parts.append(QString("%1%2.%3").arg(trainName).arg(trainNumber).arg(refList.join(".")));
+                            attribute = QXmlStreamAttribute(attr.name().toString(), parts.join("\\"));
+                        }
+                        else
+                            attribute = QXmlStreamAttribute(attr.name().toString(), attr.value().toString());
+                        writer->writeAttribute(attribute);
+                    }
                 }
-                writer->writeStartElement(reader->name().toString());
-
-                if(reader->name() == "FahrplanEintrag")
+                else if(reader->name() == "FahrplanEintrag" || reader->name() == "FplAnk" || reader->name() == "FplAbf")
                 {
                     foreach(auto &attr, reader->attributes())
                     {
@@ -117,13 +145,14 @@ void MainWindow::on_pbGenerate_clicked()
         file->rename(filename);
     }
     xmlFile.close();
+    ui->pbGenerate->setEnabled(true);
     statusBar()->showMessage(tr("finished"));
     QMessageBox::information(this, tr("Om"), tr("Files generation process is finished successfully"), QMessageBox::Ok);
 }
 
 void MainWindow::on_pbBrowse_clicked()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Select File"), QDir::homePath(), tr("Train (*.trn)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Select File"), QDir::homePath(), tr("Train (*.trn);;Time table (*.timetable.xml)"));
     ui->leFileName->setText(fileName);
 }
 
