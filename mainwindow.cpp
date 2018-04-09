@@ -87,11 +87,13 @@ void MainWindow::on_pbGenerate_clicked()
                         {
                             QString tn = attr.value().toString();
                             auto tnList = tn.split('_');
-                            QString tnLastValue = tnList.last();
-                            int tnLastNumber = tnLastValue.toLongLong() + (ui->spTrain->value() * (i+1));
-                            tnList.removeLast();
-                            tnList << QString::number(tnLastNumber);
-                            trainNumber = tnList.join("_");
+                            QStringList newName;
+                            foreach(auto part, tnList)
+                            {
+                                int tnLastNumber = part.toLongLong() + (ui->spTrain->value() * (i+1));
+                                newName << QString::number(tnLastNumber);
+                            }
+                            trainNumber = newName.join("_");
                             attribute = QXmlStreamAttribute(attr.name().toString(), trainNumber);
                         }
                         else
