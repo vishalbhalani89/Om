@@ -45,7 +45,7 @@ void MainWindow::on_pbGenerate_clicked()
 
     auto reader = new QXmlStreamReader(&xmlFile);
     QString trainName = "";
-    qint64 trainNumber = 0;
+    QString trainNumber = 0;
     QFileInfo info(xmlFile);
     QString suffix = info.completeSuffix();
 
@@ -85,8 +85,14 @@ void MainWindow::on_pbGenerate_clicked()
                             trainName = attr.value().toString();
                         if(attr.name().toString() == "Nummer")
                         {
-                            trainNumber = attr.value().toLongLong() + (ui->spTrain->value() * (i+1));
-                            attribute = QXmlStreamAttribute(attr.name().toString(), QString::number(trainNumber));
+                            QString tn = attr.value().toString();
+                            auto tnList = tn.split('_');
+                            QString tnLastValue = tnList.last();
+                            int tnLastNumber = tnLastValue.toLongLong() + (ui->spTrain->value() * (i+1));
+                            tnList.removeLast();
+                            tnList << QString::number(tnLastNumber);
+                            trainNumber = tnList.join("_");
+                            attribute = QXmlStreamAttribute(attr.name().toString(), trainNumber);
                         }
                         else
                             attribute = QXmlStreamAttribute(attr.name().toString(), attr.value().toString());
